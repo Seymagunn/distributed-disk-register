@@ -81,6 +81,39 @@ distributed-disk-register/
 │       └── proto/
 │               └── family.proto
 ```
+## Sistem Mimarisi
+
+Bu projede, mesajların güvenli ve hata toleranslı şekilde saklanması için
+gRPC + Protobuf ve TCP birlikte kullanılmıştır.
+
+### Düğüm Yapısı
+- Sistemdeki tüm düğümler aynı programı çalıştırır.
+- 5555 portunu alan düğüm lider olarak görev yapar.
+- Diğer düğümler lider düğüme bağlanarak sisteme üye olur.
+
+### İstemci – Lider Haberleşmesi
+- İstemciler sadece lider düğüm ile haberleşir.
+- Haberleşme TCP üzerinden ve metin tabanlıdır.
+- İstemci aşağıdaki komutları gönderebilir:
+  - `SET <message_id> <message>`
+  - `GET <message_id>`
+
+### Düğümler Arası Haberleşme
+- Lider ve üye düğümler arasında gRPC + Protobuf kullanılır.
+- Düğümler kendi aralarında metin tabanlı mesaj göndermez.
+
+### Hata Toleransı
+- Hata tolerans değeri `tolerance.conf` dosyasından okunur.
+- Her mesaj, lider düğüm ve belirlenen sayıda üye düğümde saklanır.
+- Lider, mesajların hangi düğümlerde saklandığını takip eder.
+
+### Diskte Saklama
+- Her düğüm, kendisine gelen mesajları kendi diskine kaydeder.
+
+### Hata Durumları
+- Üye düğümler çalışma sırasında kapanabilir.
+- GET isteği geldiğinde lider, mesajı saklayan ve çalışır durumda olan
+  bir düğümden mesajı alarak istemciye gönderir.
 
 ## 👨🏻‍💻 Kodlama
 
