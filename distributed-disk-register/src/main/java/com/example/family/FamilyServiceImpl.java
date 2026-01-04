@@ -4,17 +4,23 @@ import family.Empty;
 import family.FamilyServiceGrpc;
 import family.FamilyView;
 import family.NodeInfo;
-import family.ChatMessage;
+import family.StoreRequest;
+import family.StoreResponse;
+import family.FetchRequest;
+import family.FetchResponse;
+
 import io.grpc.stub.StreamObserver;
 
 public class FamilyServiceImpl extends FamilyServiceGrpc.FamilyServiceImplBase {
 
     private final NodeRegistry registry;
     private final NodeInfo self;
+    private final DiskStore diskStore;
 
     public FamilyServiceImpl(NodeRegistry registry, NodeInfo self) {
         this.registry = registry;
         this.self = self;
+        this.diskStore = new DiskStore(self.getPort());
         this.registry.add(self);
     }
 
@@ -40,16 +46,50 @@ public class FamilyServiceImpl extends FamilyServiceGrpc.FamilyServiceImplBase {
         responseObserver.onCompleted();
     }
 
-    // Diğer düğümlerden broadcast mesajı geldiğinde
     @Override
-    public void receiveChat(ChatMessage request, StreamObserver<Empty> responseObserver) {
-        System.out.println("💬 Incoming message:");
-        System.out.println("  From: " + request.getFromHost() + ":" + request.getFromPort());
-        System.out.println("  Text: " + request.getText());
-        System.out.println("  Timestamp: " + request.getTimestamp());
-        System.out.println("--------------------------------------");
+    public void storeMessage(StoreRequest request,
+                             StreamObserver<StoreResponse> responseObserver) {
 
-        responseObserver.onNext(Empty.newBuilder().build());
+        int messageId = request.getMessage().getMessageId();
+        String text = request.getMessage().getText();
+
+        diskStore.save(messageId, text);
+        registry.registerMessage(messageId, self);
+
+        responseObserver.onNext(
+                StoreResponse.newBuilder()
+                        .setSuccess(true)
+                        .build()
+        );
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void fetchMessage(FetchRequest request,
+                             StreamObserver<FetchResponse> responseObserver) {
+
+        int messageId = request.getMessageId();
+        String text = diskStore.load(messageId);
+
+        if (text == null) {
+            responseObserver.onNext(
+                    FetchResponse.newBuilder()
+                            .setFound(false)
+                            .build()
+            );
+        } else {
+            responseObserver.onNext(
+                    FetchResponse.newBuilder()
+                            .setFound(true)
+                            .setMessage(
+                                    family.ChatMessage.newBuilder()
+                                            .setMessageId(messageId)
+                                            .setText(text)
+                                            .build()
+                            )
+            );
+        }
+
         responseObserver.onCompleted();
     }
 }

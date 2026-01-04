@@ -11,6 +11,9 @@ public class NodeRegistry {
 
     private final Set<NodeInfo> nodes = ConcurrentHashMap.newKeySet();
 
+    private final ConcurrentHashMap<Integer, Set<NodeInfo>> messageLocations =
+            new ConcurrentHashMap<>();
+
     public void add(NodeInfo node) {
         nodes.add(node);
     }
@@ -25,5 +28,18 @@ public class NodeRegistry {
 
     public void remove(NodeInfo node) {
         nodes.remove(node);
+        for (Set<NodeInfo> holders : messageLocations.values()) {
+            holders.remove(node);
+        }
+    }
+
+    public void registerMessage(int messageId, NodeInfo node) {
+        messageLocations
+                .computeIfAbsent(messageId, k -> ConcurrentHashMap.newKeySet())
+                .add(node);
+    }
+
+    public Set<NodeInfo> getMessageLocations(int messageId) {
+        return messageLocations.getOrDefault(messageId, Set.of());
     }
 }
